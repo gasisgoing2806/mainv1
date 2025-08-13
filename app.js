@@ -1,8 +1,17 @@
+import {
+  todayKey,
+  loadRoot, saveRoot,
+  listAccounts, createAccount, setSelected,
+  getGoal, setGoal, addEntry, undoLast, resetToday, todayTotal, historyTotals
+} from './storage.js';
 
-import { todayKey, loadState, saveState, addEntry, undoLast, todayTotal, historyTotals } from './storage.js';
+let root = loadRoot();
 
-let state = loadState();
 const els = {
+  installBtn: document.getElementById('installBtn'),
+  accountSelect: document.getElementById('accountSelect'),
+  addAccountBtn: document.getElementById('addAccountBtn'),
+
   todayTotal: document.getElementById('todayTotal'),
   progressBar: document.getElementById('progressBar'),
   goalInput: document.getElementById('goalInput'),
@@ -14,19 +23,46 @@ const els = {
   addCustomBtn: document.getElementById('addCustomBtn'),
   historyList: document.getElementById('historyList'),
   historyChart: document.getElementById('historyChart'),
-  installBtn: document.getElementById('installBtn'),
 };
 
-// Initialize goal input
-els.goalInput.value = state.goal_ml;
+// --- Account UI ---
+function refreshAccounts() {
+  const opts = listAccounts(root);
+  els.accountSelect.innerHTML = opts.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+  // ensure selected attribute matches root
+  els.accountSelect.value = opts.find(o => o.id === (root.selected || o.id))?.id || opts[0]?.id;
+}
+els.accountSelect.addEventListener('change', () => {
+  setSelected(root, els.accountSelect.value);
+  refresh();  // redraw UI for selected account
+});
+els.addAccountBtn.addEventListener('click', () => {
+  const name = prompt('New account name:', 'Work');
+  if (!name) return;
+  createAccount(root, name.trim());
+  refreshAccounts();
+  refresh();
+});
 
-// Quick-add buttons
+// --- Goal ---
+els.goalInput.value = getGoal(root);
+els.saveGoalBtn.addEventListener('click', () => {
+  const g = Number(els.goalInput.value);
+  if (!Number.isFinite(g) || g <= 0) {
+    toast('Enter a positive number for goal.');
+    return;
+  }
+  setGoal(root, g);
+  toast(`Goal updated: ${getGoal(root)} ml`);
+  refresh();
+});
+
+// --- Quick add / custom / undo / reset ---
 document.querySelectorAll('.chip[data-amt]').forEach((btn) => {
   btn.addEventListener('click', () => {
     addAmount(Number(btn.dataset.amt));
   });
 });
-
 els.addCustomBtn.addEventListener('click', () => {
   const v = Number(els.customAmt.value || 0);
   if (v > 0) addAmount(v);
@@ -39,59 +75,50 @@ els.customAmt.addEventListener('keydown', (e) => {
     els.customAmt.value = '';
   }
 });
-
 els.undoBtn.addEventListener('click', () => {
-  const removed = undoLast(state);
+  const removed = undoLast(root);
   toast(removed ? `Removed −${removed} ml` : 'Nothing to undo');
   refresh();
 });
-
-els.saveGoalBtn.addEventListener('click', () => {
-  const g = Number(els.goalInput.value);
-  if (!Number.isFinite(g) || g <= 0) {
-    toast('Enter a positive number for goal.');
-    return;
-  }
-  state.goal_ml = Math.round(g);
-  saveState(state);
-  toast(`Goal updated: ${state.goal_ml} ml`);
-  refresh();
-});
-
 els.resetBtn.addEventListener('click', () => {
-  if (!confirm('Clear today’s entries?')) return;
-  state.days[todayKey()] = { entries: [] };
-  saveState(state);
+  if (!confirm('Clear today’s entries for this account?')) return;
+  resetToday(root);
   refresh();
 });
 
 function addAmount(ml) {
   if (ml <= 0) return;
-  addEntry(state, ml);
+  addEntry(root, ml);
   refresh();
-  const tot = todayTotal(state);
-  if (tot >= state.goal_ml) toast('Hydration goal reached! 🎉');
+  const tot = todayTotal(root);
+  if (tot >= getGoal(root)) toast('Hydration goal reached! 🎉');
 }
 
-// UI refresh
+// --- UI refresh ---
 function refresh() {
-  // ensure today bucket exists
-  state.days[todayKey()] ??= { entries: [] };
-  saveState(state);
+  refreshAccounts();
 
-  const total = todayTotal(state);
+  els.goalInput.value = getGoal(root);
+
+  const total = todayTotal(root);
   els.todayTotal.textContent = `${total} ml`;
-  const pct = Math.max(0, Math.min(100, (total / Math.max(1, state.goal_ml)) * 100));
+  const pct = Math.max(0, Math.min(100, (total / Math.max(1, getGoal(root))) * 100));
   els.progressBar.style.width = `${pct}%`;
 
-  // entries list (newest first)
-  const entries = state.days[todayKey()].entries.slice().reverse();
+  const k = todayKey();
+  // Build entries list from current state (we don’t expose read directly, but it’s rendered via historyTotals/todayTotal)
+  // We’ll reconstruct from history for today only:
+  // For entries list, we need timestamps; simplest: read from storage directly:
+  // Re-load quickly to get raw data (safe: loadRoot() gives same object structure)
+  const raw = loadRoot(); // fresh read
+  const st = raw.accounts[raw.selected].data;
+  const entries = (st.days[k]?.entries || []).slice().reverse();
   els.entriesList.innerHTML = entries.map(e => `<li><span>${e.ts}</span><span>+${e.ml} ml</span></li>`).join('');
 
   // history list + chart
-  const hist = historyTotals(state, 14);
+  const hist = historyTotals(root, 14);
   els.historyList.innerHTML = hist.map(([d,t]) => `<li><span>${d}</span><span>${t} ml</span></li>`).join('');
-  drawChart(els.historyChart, hist, state.goal_ml);
+  drawChart(els.historyChart, hist, getGoal(root));
 }
 
 function drawChart(canvas, data, goal) {
@@ -134,7 +161,6 @@ function drawChart(canvas, data, goal) {
   data.forEach(([date, val], i) => {
     const y = toY(val);
     const barH = h - padding - y;
-    // gradient
     const grad = ctx.createLinearGradient(0, y, 0, y + barH);
     grad.addColorStop(0, '#0ea5e9');
     grad.addColorStop(1, '#22d3ee');
@@ -167,14 +193,14 @@ function toast(msg) {
   setTimeout(() => { toastEl.style.opacity = '0'; }, 1800);
 }
 
-// PWA: install prompt
+// PWA install prompt (unchanged)
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   els.installBtn.hidden = false;
 });
-els.installBtn.addEventListener('click', async () => {
+els.installBtn?.addEventListener('click', async () => {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
   await deferredPrompt.userChoice;
@@ -182,19 +208,7 @@ els.installBtn.addEventListener('click', async () => {
   els.installBtn.hidden = true;
 });
 
-// Service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js');
-  });
-}
-
-// Initial paint
+// Initial render + rollover check
 refresh();
+setInterval(() => { root = loadRoot(); refresh(); }, 60_000);
 
-// New day roll-over check every minute
-setInterval(() => {
-  // If todayKey changed, refresh to create new bucket
-  state = loadState();
-  refresh();
-}, 60_000);

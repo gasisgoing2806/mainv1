@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Water Tracker</title>
+  <meta name="theme-color" content="#0ea5e9" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>💧 Water Tracker</h1>
+    <button id="installBtn" hidden>Install</button>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <div class="label">Today:</div>
+        <div id="todayTotal" class="value">0 ml</div>
+        <div class="spacer"></div>
+        <div class="label">Goal (ml):</div>
+        <input id="goalInput" type="number" min="1" step="50" />
+        <button id="saveGoalBtn" class="secondary">Save</button>
+      </div>
+
+      <div class="progress">
+        <div id="progressBar"></div>
+      </div>
+
+      <div class="row wrap gap">
+        <button class="chip" data-amt="100">+100 ml</button>
+        <button class="chip" data-amt="250">+250 ml</button>
+        <button class="chip" data-amt="500">+500 ml</button>
+        <input id="customAmt" type="number" min="1" placeholder="Custom ml" />
+        <button id="addCustomBtn" class="primary">Add</button>
+        <div class="spacer"></div>
+        <button id="undoBtn" class="warn">Undo</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Entries</h2>
+      <ul id="entriesList" class="list"></ul>
+      <div class="row right">
+        <button id="resetBtn" class="danger">Reset Day</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>History (Last 14 Days)</h2>
+      <canvas id="historyChart" width="800" height="260" aria-label="History chart"></canvas>
+      <ul id="historyList" class="list compact"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <small>Local-only, offline-first. Your data stays in your browser.</small>
+  </footer>
+
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

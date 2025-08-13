@@ -9,10 +9,21 @@
   <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* tiny style for the account selector */
+    select, input[type=text] { 
+      font: inherit; padding: 8px 10px; border-radius: 10px; 
+      border: 1px solid var(--border); background: #0f1a31; color: var(--text);
+    }
+  </style>
 </head>
 <body>
   <header>
     <h1>💧 Water Tracker</h1>
+    <div class="spacer"></div>
+    <label class="label" for="accountSelect">Account:</label>
+    <select id="accountSelect" title="Select account"></select>
+    <button id="addAccountBtn" class="secondary">Add account</button>
     <button id="installBtn" hidden>Install</button>
   </header>
 
@@ -61,8 +72,7 @@
     <small>Local-only, offline-first. Your data stays in your browser.</small>
   </footer>
 
-  <script src="app.js"></script>
-<script type="module" src="app.js"></script>
-
+  <script type="module" src="app.js"></script>
 </body>
 </html>
+

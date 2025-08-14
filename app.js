@@ -1,3 +1,4 @@
+// ===================== app.js (ES module) =====================
 import {
   todayKey,
   loadRoot, saveRoot,
@@ -25,22 +26,24 @@ const els = {
   historyChart: document.getElementById('historyChart'),
 };
 
-// --- Account UI ---
+// --- Accounts ---
 function refreshAccounts() {
   const opts = listAccounts(root);
   els.accountSelect.innerHTML = opts.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
-  // ensure selected attribute matches root
-  els.accountSelect.value = opts.find(o => o.id === (root.selected || o.id))?.id || opts[0]?.id;
+  // Ensure the selected option matches root.selected
+  const sel = opts.find(o => o.id === root.selected)?.id || opts[0]?.id;
+  if (sel) els.accountSelect.value = sel;
 }
-els.accountSelect.addEventListener('change', () => {
+
+els.accountSelect?.addEventListener('change', () => {
   setSelected(root, els.accountSelect.value);
-  refresh();  // redraw UI for selected account
+  refresh();
 });
-els.addAccountBtn.addEventListener('click', () => {
+
+els.addAccountBtn?.addEventListener('click', () => {
   const name = prompt('New account name:', 'Work');
   if (!name) return;
   createAccount(root, name.trim());
-  refreshAccounts();
   refresh();
 });
 
@@ -57,17 +60,17 @@ els.saveGoalBtn.addEventListener('click', () => {
   refresh();
 });
 
-// --- Quick add / custom / undo / reset ---
+// --- Add / Undo / Reset ---
 document.querySelectorAll('.chip[data-amt]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    addAmount(Number(btn.dataset.amt));
-  });
+  btn.addEventListener('click', () => addAmount(Number(btn.dataset.amt)));
 });
+
 els.addCustomBtn.addEventListener('click', () => {
   const v = Number(els.customAmt.value || 0);
   if (v > 0) addAmount(v);
   els.customAmt.value = '';
 });
+
 els.customAmt.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const v = Number(els.customAmt.value || 0);
@@ -75,11 +78,13 @@ els.customAmt.addEventListener('keydown', (e) => {
     els.customAmt.value = '';
   }
 });
+
 els.undoBtn.addEventListener('click', () => {
   const removed = undoLast(root);
   toast(removed ? `Removed −${removed} ml` : 'Nothing to undo');
   refresh();
 });
+
 els.resetBtn.addEventListener('click', () => {
   if (!confirm('Clear today’s entries for this account?')) return;
   resetToday(root);
@@ -96,8 +101,10 @@ function addAmount(ml) {
 
 // --- UI refresh ---
 function refresh() {
-  refreshAccounts();
+  // Re-load root to reflect any background changes (e.g., another tab or day rollover)
+  root = loadRoot();
 
+  refreshAccounts();
   els.goalInput.value = getGoal(root);
 
   const total = todayTotal(root);
@@ -105,17 +112,13 @@ function refresh() {
   const pct = Math.max(0, Math.min(100, (total / Math.max(1, getGoal(root))) * 100));
   els.progressBar.style.width = `${pct}%`;
 
+  // Entries (newest first)
   const k = todayKey();
-  // Build entries list from current state (we don’t expose read directly, but it’s rendered via historyTotals/todayTotal)
-  // We’ll reconstruct from history for today only:
-  // For entries list, we need timestamps; simplest: read from storage directly:
-  // Re-load quickly to get raw data (safe: loadRoot() gives same object structure)
-  const raw = loadRoot(); // fresh read
-  const st = raw.accounts[raw.selected].data;
+  const st = root.accounts[root.selected].data;
   const entries = (st.days[k]?.entries || []).slice().reverse();
   els.entriesList.innerHTML = entries.map(e => `<li><span>${e.ts}</span><span>+${e.ml} ml</span></li>`).join('');
 
-  // history list + chart
+  // History list + chart
   const hist = historyTotals(root, 14);
   els.historyList.innerHTML = hist.map(([d,t]) => `<li><span>${d}</span><span>${t} ml</span></li>`).join('');
   drawChart(els.historyChart, hist, getGoal(root));
@@ -132,11 +135,18 @@ function drawChart(canvas, data, goal) {
   const count = data.length;
   const barWidth = (w - padding*2 - barGap*(count-1)) / count;
 
+  // Colors tuned for pink theme
+  const axisColor = 'rgba(31, 41, 55, 0.35)'; // dark gray
+  const goalColor = '#ec4899';                // pink for goal line/label
+  const dateLabel = '#6b7280';                // muted gray
+  const barTop = '#db2777';                   // brand pink
+  const barBottom = '#f472b6';                // light pink
+
   const maxVal = Math.max(goal, ...data.map(d => d[1]), 1);
   const toY = (val) => h - padding - (val / maxVal) * (h - padding*2);
 
   // axes
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.strokeStyle = axisColor;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(padding, padding);
@@ -144,31 +154,31 @@ function drawChart(canvas, data, goal) {
   ctx.lineTo(w - padding, h - padding);
   ctx.stroke();
 
-  // goal line
+  // goal line + label
   const gy = toY(goal);
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+  ctx.strokeStyle = goalColor;
   ctx.setLineDash([6,4]);
   ctx.beginPath();
   ctx.moveTo(padding, gy);
   ctx.lineTo(w - padding, gy);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.9)';
-  ctx.fillText(`Goal ${goal} ml`, w - padding - 100, gy - 6);
+  ctx.fillStyle = goalColor;
+  ctx.fillText(`Goal ${goal} ml`, w - padding - 110, gy - 6);
 
   // bars
   let x = padding;
-  data.forEach(([date, val], i) => {
+  data.forEach(([date, val]) => {
     const y = toY(val);
     const barH = h - padding - y;
     const grad = ctx.createLinearGradient(0, y, 0, y + barH);
-    grad.addColorStop(0, '#0ea5e9');
-    grad.addColorStop(1, '#22d3ee');
+    grad.addColorStop(0, barTop);
+    grad.addColorStop(1, barBottom);
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, barWidth, barH);
 
-    // label (MM-DD)
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    // date label (MM-DD)
+    ctx.fillStyle = dateLabel;
     const mmdd = date.slice(5);
     ctx.fillText(mmdd, x + barWidth/2 - 12, h - padding + 14);
 
@@ -176,7 +186,7 @@ function drawChart(canvas, data, goal) {
   });
 }
 
-// Tiny toast
+// Toast
 let toastEl;
 function toast(msg) {
   if (!toastEl) {
@@ -193,12 +203,12 @@ function toast(msg) {
   setTimeout(() => { toastEl.style.opacity = '0'; }, 1800);
 }
 
-// PWA install prompt (unchanged)
+// PWA install prompt
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  els.installBtn.hidden = false;
+  els.installBtn && (els.installBtn.hidden = false);
 });
 els.installBtn?.addEventListener('click', async () => {
   if (!deferredPrompt) return;
@@ -208,7 +218,13 @@ els.installBtn?.addEventListener('click', async () => {
   els.installBtn.hidden = true;
 });
 
-// Initial render + rollover check
+// Initial render + day rollover check
 refresh();
-setInterval(() => { root = loadRoot(); refresh(); }, 60_000);
+setInterval(() => { refresh(); }, 60_000);
 
+// Register service worker (kept here in case index.html doesn't)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js');
+  });
+}

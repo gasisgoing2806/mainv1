@@ -17,9 +17,10 @@ html, body { height: 100%; }
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: #ffe6f2;
+  background: radial-gradient(1200px 700px at 12% -20%, #ff7ab6 0%, #ffc1dc 45%, #ffe0ec 100%);
   color: var(--text);
 }
+
 
 header, footer {
   max-width: 920px;

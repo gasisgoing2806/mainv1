@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'water-pwa-v9';
+const CACHE_NAME = 'water-pwa-v10';
 const ASSETS = [
   './',
   './index.html',
